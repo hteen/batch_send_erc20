@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>以太坊ERC20代币批量转账助手</title>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.2/css/bulma.min.css" />
+    </head>
+
+    <body>
+        <div id="app">
+            <section class="hero is-info">
+                <div class="hero-body">
+                    <p class="title">
+                        以太坊ERC20代币批量转账助手
+                    </p>
+                </div>
+            </section>
+            <div class="section">
+                <div class="columns">
+                    <div class="column is-full-mobile is-one-third-tablet is-one-third-desktop">
+                        <article class="message is-small is-info">
+                            <div class="message-header">
+                                <p>注意事项</p>
+                            </div>
+                            <div class="message-body content is-small">
+                                <ol>
+                                    <li>目前只支持以太坊ERC20代币, 操作其他代币后果自负</li>
+                                    <li>不会持久任何数据, 刷新页面就会重置, 所以转账结果请自行复制</li>
+                                    <li>按步骤依次操作</li>
+                                </ol>
+                            </div>
+                        </article>
+
+                        <div class="box">
+                            <div class="field">
+                                <label class="label is-small">节点RPC地址</label>
+                                <div class="control">
+                                    <input class="input is-small" type="text" v-model="rpc" />
+                                </div>
+                            </div>
+
+                            <article class="message is-small is-light">
+                                <div class="message-body content is-small">
+                                    <p>节点主网ID: {{ chainId }}</p>
+                                </div>
+                            </article>
+
+                            <div class="field">
+                                <label class="label is-small">钱包私钥</label>
+                                <div class="control">
+                                    <input class="input is-small" type="password" v-model="privateKey" />
+                                </div>
+                            </div>
+
+                            <article class="message is-small is-light">
+                                <div class="message-body content is-small">
+                                    <p>钱包地址: {{ address }}</p>
+                                    <p>当前余额: {{ balance }}</p>
+                                </div>
+                            </article>
+
+                            <div class="field">
+                                <label class="label is-small">Token(ERC20)</label>
+                                <div class="control">
+                                    <input
+                                        class="input is-small"
+                                        placeholder="0x31a126..."
+                                        type="text"
+                                        v-model="token.address"
+                                    />
+                                </div>
+                            </div>
+
+                            <article class="message is-small is-light">
+                                <div class="message-body content is-small">
+                                    <p>Name: {{ token.name }}</p>
+                                    <p>Symbol: {{ token.symbol }}</p>
+                                    <p>合约地址: {{ token.address }}</p>
+                                    <p>精度: {{ token.decimals }}</p>
+                                    <p>总发行量: {{ token.totalSupply }}</p>
+                                    <p>当前余额: {{ token.balance }}</p>
+                                </div>
+                            </article>
+
+                            <div class="field is-grouped is-grouped-right">
+                                <div class="control">
+                                    <button v-on:click="init" class="button is-small is-info is-light">
+                                        1. 读取信息
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="field">
+                                <label class="label is-small">发送数量</label>
+                                <div class="control">
+                                    <input class="input is-small" type="text" v-model="sentAmount" />
+                                </div>
+                            </div>
+
+                            <div class="field">
+                                <label class="label is-small">目标地址</label>
+                                <div class="control">
+                                    <textarea
+                                        v-model="receiver"
+                                        class="textarea is-small"
+                                        placeholder="一行一个
+0x31a126...
+0x31a127..."
+                                    ></textarea>
+                                </div>
+                            </div>
+
+                            <div class="field is-grouped is-grouped-right">
+                                <div class="control">
+                                    <button v-on:click="parseReceiver" class="button is-small is-info is-light">
+                                        2. 整理地址
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="column is-full-mobile is-two-thirds-tablet is-two-thirds-desktop">
+                        <div class="box ">
+                            <div class="table-container">
+                                <table class="table is-narrow is-striped is-bordered is-fullwidth">
+                                    <thead>
+                                        <tr>
+                                            <th>接收地址</th>
+                                            <th>数量</th>
+                                            <th>Hash</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="item in receiverItems" :key="item.address">
+                                            <td>{{item.address}}</td>
+                                            <td>
+                                                <input
+                                                    v-if="!item.tx?.hash"
+                                                    class="input is-small"
+                                                    v-model="item.sentAmount"
+                                                />
+                                                <template v-else>{{item.sentAmount}}</template>
+                                            </td>
+                                            <td>{{item.tx?.hash}}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="columns">
+                                <div class="column">
+                                    <button :disabled="receiving" v-on:click="send" class="button is-small is-info">
+                                        3. 确定转账
+                                    </button>
+                                </div>
+                                <div class="column is-narrow">
+                                    <div class="content is-small">
+                                        <p>共 {{receiverItems.length}} 个接收地址</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/vue@2.6.12"></script>
+        <script
+            type="text/javascript"
+            integrity="sha384-3w81r2QihiQT4GxU7yDk2/LYt0tFMnlSLSYVpy1VVhWomduuub5VVsTyKt5LPf8G"
+            crossorigin="anonymous"
+            src="https://cdn-cors.ethers.io/lib/ethers-5.1.0.umd.min.js"
+        ></script>
+
+        <script>
+            // ERC20 API
+            const abi=[{"inputs":[{"internalType":"string","name":"name_","type":"string"},{"internalType":"string","name":"symbol_","type":"string"}],"stateMutability":"nonpayable","type":"constructor"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"owner","type":"address"},{"indexed":true,"internalType":"address","name":"spender","type":"address"},{"indexed":false,"internalType":"uint256","name":"value","type":"uint256"}],"name":"Approval","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"value","type":"uint256"}],"name":"Transfer","type":"event"},{"inputs":[],"name":"name","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"symbol","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"decimals","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"totalSupply","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"recipient","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"transfer","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"owner","type":"address"},{"internalType":"address","name":"spender","type":"address"}],"name":"allowance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"approve","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"sender","type":"address"},{"internalType":"address","name":"recipient","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"transferFrom","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"addedValue","type":"uint256"}],"name":"increaseAllowance","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"subtractedValue","type":"uint256"}],"name":"decreaseAllowance","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"}];
+
+            new Vue({
+                el: "#app",
+                data: {
+                    rpc: "",
+                    privateKey: "",
+                    address: "",
+                    balance: "",
+                    chainId: "",
+                    provider: null,
+                    walletWithProvider: null,
+                    contract: null,
+                    receiver: "",
+                    sentAmount: 0,
+                    receiverItems: [],
+                    receiving: false,
+                    token: {
+                        address: "",
+                        name: "",
+                        totalSupply: "",
+                        decimals: "",
+                        symbol: "",
+                        balance: "",
+                    },
+                },
+                created: function() {},
+                watch: {
+                    "token.address": function(newAddress, oldAddress) {
+                        if (newAddress == oldAddress) {
+                            return;
+                        }
+
+                        this.getTokenInfo();
+                    },
+                },
+                methods: {
+                    init() {
+                        this.provider = new ethers.providers.JsonRpcProvider(this.rpc);
+                        this.getInfo();
+                    },
+                    async getInfo() {
+                        let chain = await this.provider.getNetwork();
+                        this.chainId = chain.chainId;
+
+                        if (!this.privateKey) {
+                            return;
+                        }
+
+                        this.walletWithProvider = new ethers.Wallet(this.privateKey, this.provider);
+                        this.address = await this.walletWithProvider.getAddress();
+                        let balance = await this.walletWithProvider.getBalance();
+                        this.balance = ethers.utils.formatEther(balance);
+
+                        this.getTokenInfo();
+                    },
+                    async getTokenInfo() {
+                        this.token.name = "";
+                        this.token.totalSupply = "";
+                        this.token.decimals = "";
+                        this.token.symbol = "";
+                        this.token.balance = "";
+
+                        if (!ethers.utils.isAddress(this.token.address)) {
+                            return;
+                        }
+
+                        if (!this.walletWithProvider) {
+                            return;
+                        }
+
+                        this.contract = new ethers.Contract(this.token.address, abi, this.walletWithProvider);
+
+                        this.token.name = await this.contract.name();
+                        this.token.symbol = await this.contract.symbol();
+                        this.token.decimals = await this.contract.decimals();
+                        let totalSupply = await this.contract.totalSupply();
+                        let balance = await this.contract.balanceOf(this.address);
+
+                        this.token.balance = ethers.utils.formatUnits(balance, this.token.decimals);
+                        this.token.totalSupply = ethers.utils.formatUnits(totalSupply, this.token.decimals);
+                    },
+                    parseReceiver() {
+                        this.receiverItems = [];
+                        this.receiver
+                            .split("\n")
+                            // 去重
+                            .filter((v, i, a) => a.indexOf(v) === i)
+                            .forEach((address) => {
+                                var address = address.trim();
+                                if (ethers.utils.isAddress(address)) {
+                                    this.receiverItems.push({
+                                        address: address,
+                                        sentAmount: this.sentAmount,
+                                    });
+                                }
+                            });
+                    },
+                    async send() {
+                        if (!this.token.decimals) {
+                            alert("请先完成步骤 1.读取信息");
+                            return;
+                        }
+
+                        this.receiving = true;
+                        for (let i = 0; i < this.receiverItems.length; i++) {
+                            var item = this.receiverItems[i];
+
+                            var sentAmount = ethers.BigNumber.from(item.sentAmount);
+                            if (sentAmount.gt(0)) {
+                                var amount = ethers.utils.parseUnits(sentAmount.toString(), this.token.decimals);
+
+                                let tx = await this.contract.transfer(item.address, amount);
+                                Vue.set(this.receiverItems[i], "tx", tx);
+                            }
+                        }
+                        this.receiving = false;
+                    },
+                },
+            });
+        </script>
+    </body>
+</html>
