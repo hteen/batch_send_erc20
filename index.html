@@ -121,7 +121,7 @@
                         </div>
                     </div>
                     <div class="column is-full-mobile is-two-thirds-tablet is-two-thirds-desktop">
-                        <div class="box ">
+                        <div class="box">
                             <div class="table-container">
                                 <table class="table is-narrow is-striped is-bordered is-fullwidth">
                                     <thead>
@@ -200,9 +200,9 @@
                         balance: "",
                     },
                 },
-                created: function() {},
+                created: function () {},
                 watch: {
-                    "token.address": function(newAddress, oldAddress) {
+                    "token.address": function (newAddress, oldAddress) {
                         if (newAddress == oldAddress) {
                             return;
                         }
@@ -212,6 +212,10 @@
                 },
                 methods: {
                     init() {
+                        if (!this.rpc || !this.privateKey || !this.token.address) {
+                            alert("所有输入框为必填");
+                            return;
+                        }
                         this.provider = new ethers.providers.JsonRpcProvider(this.rpc);
                         this.getInfo();
                     },
@@ -275,6 +279,11 @@
                     async send() {
                         if (!this.token.decimals) {
                             alert("请先完成步骤 1.读取信息");
+                            return;
+                        }
+
+                        var r = confirm("确定操作吗?");
+                        if (r != true) {
                             return;
                         }
 
